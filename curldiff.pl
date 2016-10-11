@@ -11,7 +11,7 @@ use Text::Diff;
 my ($host, $diffpage) = @ARGV;
 my ($hscheme, $hauth, $hpath, $hquery) = uri_split($host);
 if(!$host || !$hscheme || !$hauth) { print "usage: ./curlGet.pl http(s)://hostname.com/\n"; exit; }
-$hpath = "/index.html" unless $hpath;
+# $hpath = "/index.html" unless $hpath;
 my ($pscheme, $pauth, $ppath, $pquery);
 
 my $cfg = new Config::Simple('curldiff.cfg');
