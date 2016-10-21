@@ -33,9 +33,11 @@ foreach my $link (@linkstack) {
         $link = url_parse($link);
         unless ($link ~~ @linkstack) { push @linkstack, $link if $link; }
     }
-    
-    my $filename = create_file($link, $html);
+    my $filepath = url_to_path($link);
+    push @filestack, $filepath;
+    create_file($filepath, $html);
 }
+
 
 if ($mkdiff) {
     foreach my $file (@filestack) {
@@ -58,7 +60,7 @@ sub curl_get
     
     $curl->setopt(CURLOPT_URL, $page);
     $curl->setopt(CURLOPT_WRITEDATA, \$output);
-    $curl->setopt(CURLOPT_ENCODING, "");
+    $curl->setopt(CURLOPT_ENCODING, "utf-8");
     $curl->setopt(CURLOPT_USERAGENT, "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1; .NET CLR 1.0.3705; .NET CLR 1.1.4322)");
     $curl->setopt(CURLOPT_FOLLOWLOCATION, 1);
     $curl->setopt(CURLOPT_SSL_VERIFYPEER, 0);
@@ -73,15 +75,12 @@ sub curl_get
 
 sub create_file
 {
-    my $link = shift @_;
+    my $filename = shift @_;
     my $data = shift @_;
     return 0 unless $data;
     
-    my ($filename) = grep { s/https?\:\/\/// } $link;
-    $filename =  $workdir . $filename;
     if ($filename =~ /[^\!\?]\/$/) {
         make_path($filename);
-        $filename .= "index.html";
     }
     unless (-d dirname($filename)) {
         make_path(dirname($filename));
@@ -105,7 +104,7 @@ sub url_parse
     if (@ext) {
         my $c;
         foreach my $arg (@ext) {
-            $c++ if $path && index($path, $arg) == -1 && $path !~ /\/$/;
+            $c++ if $path && index($path, $arg) == -1 && $path !~ /\/$/ && $path =~ /\./;
         } 
         return 0 if $c == scalar @ext;
     }
@@ -114,14 +113,28 @@ sub url_parse
     return 0                 if     $auth && $auth ne $hauth;
     return 0                 if     $path =~ /\.\.\//;
     return 0                 if     $path =~ /\/?index\.(?!html)\w+/;
+    return 0                 if     $path =~ /admin|login/;
+#     return 0                 if     $url =~ /\%/;
     $scheme = $hscheme       unless $scheme;
     $path = substr($path, 1) if     $path =~ /^\/.+/;
     $path = substr($path, 2) if     $path =~ /^\.\/.+/;
-    $path .= "index.html"    if     $path =~ /\/$/ && $query;
+#     $path .= "/"             if     $path !~ /[^\.]+/;
+#     $path = $ppath           if     $path =~ /\/$/;
+#     $path .= "/index.html"   if     $path =~ /[^\.]+/;
     $path = $ppath           unless $path;
     $auth = $pauth           unless $auth;
     
     return $url = uri_join($scheme, $auth, $path, $query);
+}
+
+sub url_to_path
+{
+    my $url = shift @_;
+    my ($scheme, $auth, $path, $query) = uri_split($url);
+    $path .= "/" if $path && $path !~ /\./ && $path !~ /\/$/;
+    $path .= "index.html" if $path =~ /\/$/;
+    $query = "?" . $query if $query;
+    return $url = $workdir . $auth . $path . $query;
 }
 
 sub mkdiff
