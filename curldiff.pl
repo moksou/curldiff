@@ -7,6 +7,7 @@ use File::Basename;
 use File::Path qw(make_path remove_tree);
 use URI::Split qw(uri_split uri_join);
 use Text::Diff;
+use URI::Encode qw(uri_decode);
 
 my ($host, $diffpage) = @ARGV;
 my ($hscheme, $hauth, $hpath, $hquery) = uri_split($host);
@@ -25,17 +26,19 @@ push @linkstack, $host;
 
 foreach my $link (@linkstack) {
     ($pscheme, $pauth, $ppath, $pquery) = uri_split($link);
+    print $link; print "\n";
     my $html = curl_get($link);
     my @links = $html =~ m/(?:href=["']?)([^\s\>"']+(?=["'])?)/g;
 #     print join("\n", @links); print "\n";
     
     foreach my $link (@links) {
         $link = url_parse($link);
+#         print $link; print "\n";
         unless ($link ~~ @linkstack) { push @linkstack, $link if $link; }
     }
-    my $filepath = url_to_path($link);
-    push @filestack, $filepath;
-    create_file($filepath, $html);
+#     my $filepath = url_to_path($link);
+#     push @filestack, $filepath;
+#     create_file($filepath, $html);
 }
 
 
@@ -78,6 +81,7 @@ sub create_file
     my $filename = shift @_;
     my $data = shift @_;
     return 0 unless $data;
+    print dirname($filename);
     
     if ($filename =~ /[^\!\?]\/$/) {
         make_path($filename);
@@ -86,7 +90,7 @@ sub create_file
         make_path(dirname($filename));
     }
     unless (-e $filename) {
-        print $filename; print "\n";
+        print "--> $filename"; print "\n";
         open  FILE, '>' . $filename;
         print FILE $data;
         close FILE;
@@ -108,23 +112,18 @@ sub url_parse
         } 
         return 0 if $c == scalar @ext;
     }
-#     return 0                 if     $path =~ /index\.\w+/;
     return 0                 if     $scheme && $scheme ne $hscheme;
     return 0                 if     $auth && $auth ne $hauth;
     return 0                 if     $path =~ /\.\.\//;
-    return 0                 if     $path =~ /\/?index\.(?!html)\w+/;
+    return 0                 if     $path =~ /\/?index\.(?!html)\w+$/;
     return 0                 if     $path =~ /admin|login/;
-#     return 0                 if     $url =~ /\%/;
     $scheme = $hscheme       unless $scheme;
     $path = substr($path, 1) if     $path =~ /^\/.+/;
     $path = substr($path, 2) if     $path =~ /^\.\/.+/;
-#     $path .= "/"             if     $path !~ /[^\.]+/;
-#     $path = $ppath           if     $path =~ /\/$/;
-#     $path .= "/index.html"   if     $path =~ /[^\.]+/;
     $path = $ppath           unless $path;
-    $auth = $pauth           unless $auth;
+    $auth = $pauth unless $auth;
     
-    return $url = uri_join($scheme, $auth, $path, $query);
+    return $url = uri_decode(uri_join($scheme, $auth, $path, $query));
 }
 
 sub url_to_path
